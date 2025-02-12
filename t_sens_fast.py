@@ -5,6 +5,7 @@ import csv
 import matplotlib.pyplot as plt
 # import scipy
 import matplotlib.patches as patches
+import sys
 
 
 
@@ -33,12 +34,13 @@ ics.append([linspace_circ(6,200),linspace_circ(10,25)])
 ics.append([linspace_circ(3,200), linspace_circ(3,25)])
 ics.append([linspace_circ(1,200), linspace_circ(1,25)])
 
-save_dir = "/home/jonatank/Documents/HML/cleaning/ABM/fp/taxis_quick_long/"
+save_dir = "/home/jonatank/Documents/HML/hml_fp/main_taxis_sens/"
 
 taxis = np.linspace(0,0.5,30)
 diffs = np.linspace(0,0.3,30)
+# diffs = np.linspace(0,0.125,5)
 
-for ic_num in range(len(ics)):
+for ic_num in [int(sys.argv[1])]:
     for t in taxis:
         for d in diffs:
             mem_run(t,0,d, f"{save_dir}t_ic_{ic_num}/taxis_{t}/diffs_{d}/", ics[ic_num][0], ics[ic_num][1])
