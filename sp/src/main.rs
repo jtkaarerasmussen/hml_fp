@@ -18,38 +18,30 @@ fn main() {
     let fish_val:f64 = 0.1;
     let habitat_width:f64 = 5.0;
 
-    // pull parameter values from cli
+    // pull parameter values from cli (2 required)
     let args:Vec<String> = env::args().collect();
-    let taxis_rate:f64 = args[1].parse().unwrap();
-    let mem_rate:f64 = args[2].parse().unwrap();
-    let diff_rate:f64 = args[3].parse().unwrap();
-    let out_path = args[4].to_string();
+    let out_path = args[1].to_string();
+    let ic_path = args[2].to_string();
 
 
     // Generate vectors of Fish and Station instances based on ic file from cli 
     // (if not provided, uniform Fish, random Stations)
     let mut f = vec![];
     let mut s = vec![];
-    if args.len() == 6{
-        let ic_path = args[5].to_string();
-        let ics = read_csv(ic_path).unwrap();
-        for loc in ics[0].clone(){
-            f.push(Fish{loc:loc, mem:Memories::new()})
-        };
-        for loc in ics[1].clone(){
-            s.push(Station{loc:loc, energy:initial_energy})
-        };
-        fish_count = f.len() as u32;
-    } else {
-        for i in 0..fish_count{
-            let f_init_val = (i as f64) / (fish_count as f64);
-            f.push(Fish{loc: f_init_val, mem: Memories::new()});
-        } 
-        for _i in 0..station_count{
-            let s_init_val = rand::random();
-            s.push(Station{energy:initial_energy, loc:s_init_val});
-        } 
-    }
+    let ics = read_csv(ic_path).unwrap();
+    for f_index in 0..ics[0].len(){
+        f.push(Fish{
+            taxis_rate:ics[1][f_index],
+            mem_rate:ics[2][f_index],
+            diff_rate:ics[3][f_index],
+            loc:ics[0][f_index],
+            mem:Memories::new()
+        })
+    };
+    for loc in ics[4].clone(){
+        s.push(Station{loc:loc, energy:initial_energy})
+    };
+    fish_count = f.len() as u32;
 
     // set stopping related parameters
     // let stop_req = 400;
@@ -57,6 +49,9 @@ fn main() {
     let stop_tol: f64 = 0.1;
     let equil_location = ((fish_count as f64)*fish_val + (birth_rate as f64)*initial_energy) / energy_loss_rate;
 
+    let only_save_edges = args.len()==4 && args[3].to_string() == "true";
+
+    let only_save_edges = true;
     // Format output dir
     match fs::remove_dir_all(out_path.clone()){
         Ok(_) => println!("remove dir worked"),
@@ -79,15 +74,19 @@ fn main() {
     for i in 0..max_iterations{
         // println!("{}", i);
         // save simulation state
-        sim.csv(out_path.clone() + "/" + &i.to_string() + ".csv").expect("csv creation broke");
+        if only_save_edges {
+            if i==0 {sim.csv(out_path.clone() + "/" + &i.to_string() + ".csv").expect("csv creation broke");}
+        } else {
+            sim.csv(out_path.clone() + "/" + &i.to_string() + ".csv").expect("csv creation broke");
+        }
 
         // simulation actions 
         sim.sub_energy(energy_loss_rate); 
         sim.add_energy(fish_val, 5.0);
         sim.birth(birth_rate);
         sim.death();
-        sim.taxis(taxis_rate, mem_rate);
-        sim.diffusion(diff_rate);
+        sim.taxis();
+        sim.diffusion();
         sim.remember();
 
         // check if early stopping reqs are met
@@ -147,14 +146,17 @@ impl Memories {
 }
 
 struct Fish {
+    taxis_rate:f64,
+    mem_rate: f64,
+    diff_rate: f64,
     loc: f64,
     mem: Memories
 }
 
 impl Fish {
-    fn new() -> Fish{
+    fn new(t:f64,m:f64,d:f64) -> Fish{
         let q = rand::random();
-        Fish{loc:q, mem:Memories::new()}
+        Fish{taxis_rate:t, mem_rate:m, diff_rate:d,loc:q, mem:Memories::new()}
     }
     
     fn get_mem_direction(&mut self, max_mem:f64, local_qual:f64, h_width:f64) -> f64 {
@@ -216,7 +218,7 @@ impl Sim {
         } 
         let mut f: Vec<Fish> = vec![];
         for _ in 0..fish_count{
-            f.push(Fish::new())
+            f.push(Fish::new(0.0,0.0,0.0))
         } 
         Sim { stations: v, fish: f, initial_energy: initial_energy, h_width:h_width } 
     }
@@ -299,22 +301,20 @@ impl Sim {
         Ok(())
     }
 
-    fn taxis(&mut self, taxis_speed:f64, mem_speed:f64){
-        let kernal_res = 500;
-        let max_steps = (taxis_speed*(kernal_res as f64)/self.h_width).round() as usize;
+    fn taxis(&mut self){
+        let kernal_res = 200;
         let mut k = vec![];
-        if taxis_speed != 0.0{
-            for i in 0..kernal_res{
-                let mut k_val = 0.0;
-                for s in self.stations.iter(){
-                    k_val += kernel(self.h_width*(i as f64)/((kernal_res-1) as f64), s.loc, self.h_width);
-                }
-                k.push(k_val)
+        for i in 0..kernal_res{
+            let mut k_val = 0.0;
+            for s in self.stations.iter(){
+                k_val += kernel(self.h_width*(i as f64)/((kernal_res-1) as f64), s.loc, self.h_width);
             }
+            k.push(k_val)
         }
 
         for f in self.fish.iter_mut(){
-            if taxis_speed != 0.0{
+            let max_steps = (f.taxis_rate*(kernal_res as f64)/self.h_width).round() as usize;
+            if f.taxis_rate != 0.0{
                 let norm_loc:f64 = f.loc / self.h_width;
                 let start_index = (norm_loc * ((kernal_res-1) as f64)).round() as usize;
                 let right_index = if start_index == kernal_res-1 {0} else {start_index+1};
@@ -334,12 +334,12 @@ impl Sim {
                 }
                 f.loc = wrap_val(f.loc,self.h_width);
             }
-            if mem_speed != 0.0{
+            if f.mem_rate != 0.0{
                 let mut k0 = 0.0;
                 for s in self.stations.iter(){
                     k0 += kernel(f.loc,s.loc, self.h_width)
                 }
-                let mem_dir = f.get_mem_direction(mem_speed, k0, self.h_width);
+                let mem_dir = f.get_mem_direction(f.mem_rate, k0, self.h_width);
                 f.loc += mem_dir;
             }
 
@@ -348,10 +348,10 @@ impl Sim {
         // println!("{}",mem_count);
     }
 
-    fn diffusion(&mut self, diff_speed:f64){
+    fn diffusion(&mut self){
         for f in self.fish.iter_mut(){
             let mut move_size:f64 = rand::random();
-            move_size = diff_speed * 2.0 * (move_size - 0.5);
+            move_size = f.diff_rate * 2.0 * (move_size - 0.5);
             f.loc += move_size;
             // f.loc = f.loc.clamp(0.0, 1.0);
             f.loc = wrap_val(f.loc, self.h_width);
