@@ -22,7 +22,7 @@ sim_inputs = []
 for ic_num in range(3):
     for p_s in range(3):
         for c in range(100):
-            sim_inputs.append((ic_num,p_s,c,f_ic[ic_num],s_ic[ic_num],param_sets[ic_num][0],param_sets[ic_num][1]))
+            sim_inputs.append((ic_num,p_s,c,f_ic[ic_num],s_ic[ic_num],param_sets[p_s][0],param_sets[p_s][1]))
 
 with ThreadPoolExecutor(max_workers=10) as executor:
     executor.map(lambda a : run(*a), sim_inputs)
