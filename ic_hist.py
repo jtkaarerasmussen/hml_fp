@@ -9,7 +9,7 @@ def run(ic_num,p_set,c,f_ic,s_ic,t,d):
     s_ic = linspace_circ(25,25,5)
     fp = [[t,0,d],[t,0,d]]
     fcs = [1000,0]
-    save_dir = f"{os.getcwd()}/trial_runs/taxis2d_full/ic_{ic_num}/p_{p_set}/{c}/"
+    save_dir = f"{os.getcwd()}/trial_runs/ic_hist/ic_{ic_num}/p_{p_set}/{c}/"
     mp_run(fp,fcs,f_ic,s_ic, save_dir,only_final=True)
 
 
