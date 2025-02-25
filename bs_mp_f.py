@@ -20,6 +20,7 @@ def create_temp_csv(fish_params, fish_counts, f_ic, s_ic, temp_path = "temp_ics.
     np.random.shuffle(ic_csv_arr)
     ic_csv_arr = np.transpose(ic_csv_arr)
 
+
     with open(temp_path, mode="w") as f:
         wtr = csv.writer(f)
         for row in ic_csv_arr:
@@ -30,10 +31,11 @@ def create_temp_csv(fish_params, fish_counts, f_ic, s_ic, temp_path = "temp_ics.
     return current_path + f"/{temp_path}"
 
 def mp_run(fish_params, fish_counts, f_ic, s_ic, out_path, only_final=True):
-    temp_csv_path = str(datetime.datetime.now()).replace(' ','_') +".csv"
+    temp_csv_path = str(datetime.datetime.now()).replace(' ','_').replace(":",".") +".csv"
     csv_path = create_temp_csv(fish_params, fish_counts, f_ic, s_ic,temp_path = temp_csv_path)
     if only_final:
         pros = subprocess.Popen(f"cd sp/target/release && ./fp {out_path} {csv_path} true", shell=True, stdout=subprocess.DEVNULL)
+        # pros = subprocess.Popen(f"cd sp/target/release && ./fp {out_path} {csv_path} true")
     else:
         pros = subprocess.Popen(f"cd sp/target/release && ./fp {out_path} {csv_path}", shell=True, stdout=subprocess.DEVNULL)
     pros.wait()
